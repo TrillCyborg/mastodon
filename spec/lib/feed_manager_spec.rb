@@ -108,14 +108,14 @@ RSpec.describe FeedManager do
 
       it 'returns false for status by followee mentioning another account' do
         bob.follow!(alice)
-        status = PostStatusService.new.call(alice, 'Hey @jeff')
+        status = PostStatusService.new.call(alice, text: 'Hey @jeff')
         expect(FeedManager.instance.filter?(:home, status, bob.id)).to be false
       end
 
       it 'returns true for status by followee mentioning blocked account' do
         bob.block!(jeff)
         bob.follow!(alice)
-        status = PostStatusService.new.call(alice, 'Hey @jeff')
+        status = PostStatusService.new.call(alice, text: 'Hey @jeff')
         expect(FeedManager.instance.filter?(:home, status, bob.id)).to be true
       end
 
@@ -149,13 +149,21 @@ RSpec.describe FeedManager do
           status = Fabricate(:status, text: 'shiitake', account: jeff)
           expect(FeedManager.instance.filter?(:home, status, alice.id)).to be true
         end
+
+        it 'returns true if phrase is contained in a poll option' do
+          alice.custom_filters.create!(phrase: 'farts', context: %w(home public), irreversible: true)
+          alice.custom_filters.create!(phrase: 'pop tarts', context: %w(home), irreversible: true)
+          alice.follow!(jeff)
+          status = Fabricate(:status, text: 'what do you prefer', poll: Fabricate(:poll, options: %w(farts POP TARts)), account: jeff)
+          expect(FeedManager.instance.filter?(:home, status, alice.id)).to be true
+        end
       end
     end
 
     context 'for mentions feed' do
       it 'returns true for status that mentions blocked account' do
         bob.block!(jeff)
-        status = PostStatusService.new.call(alice, 'Hey @jeff')
+        status = PostStatusService.new.call(alice, text: 'Hey @jeff')
         expect(FeedManager.instance.filter?(:mentions, status, bob.id)).to be true
       end
 
@@ -168,13 +176,13 @@ RSpec.describe FeedManager do
 
       it 'returns true for status by silenced account who recipient is not following' do
         status = Fabricate(:status, text: 'Hello world', account: alice)
-        alice.update(silenced: true)
+        alice.silence!
         expect(FeedManager.instance.filter?(:mentions, status, bob.id)).to be true
       end
 
       it 'returns false for status by followed silenced account' do
         status = Fabricate(:status, text: 'Hello world', account: alice)
-        alice.update(silenced: true)
+        alice.silence!
         bob.follow!(alice)
         expect(FeedManager.instance.filter?(:mentions, status, bob.id)).to be false
       end

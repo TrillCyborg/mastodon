@@ -8,8 +8,8 @@ RSpec.describe BatchedRemoveStatusService, type: :service do
   let!(:jeff)   { Fabricate(:user).account }
   let!(:hank)   { Fabricate(:account, username: 'hank', protocol: :activitypub, domain: 'example.com', inbox_url: 'http://example.com/inbox') }
 
-  let(:status1) { PostStatusService.new.call(alice, 'Hello @bob@example.com') }
-  let(:status2) { PostStatusService.new.call(alice, 'Another status') }
+  let(:status1) { PostStatusService.new.call(alice, text: 'Hello @bob@example.com') }
+  let(:status2) { PostStatusService.new.call(alice, text: 'Another status') }
 
   before do
     allow(Redis.current).to receive_messages(publish: nil)
@@ -47,19 +47,6 @@ RSpec.describe BatchedRemoveStatusService, type: :service do
 
   it 'notifies streaming API of public timeline' do
     expect(Redis.current).to have_received(:publish).with('timeline:public', any_args).at_least(:once)
-  end
-
-  it 'sends PuSH update to PuSH subscribers' do
-    expect(a_request(:post, 'http://example.com/push').with { |req|
-      matches = req.body.match(OStatus::TagManager::VERBS[:delete])
-    }).to have_been_made.at_least_once
-  end
-
-  it 'sends Salmon slap to previously mentioned users' do
-    expect(a_request(:post, "http://example.com/salmon").with { |req|
-      xml = OStatus2::Salmon.new.unpack(req.body)
-      xml.match(OStatus::TagManager::VERBS[:delete])
-    }).to have_been_made.once
   end
 
   it 'sends delete activity to followers' do
